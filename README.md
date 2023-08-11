@@ -18,3 +18,7 @@ Please add it to work this project.
   - https://assetstore.unity.com/packages/3d/environments/simplepoly-town-pack-62400
 - Fungus
   - https://github.com/snozbot/fungus/releases
+
+## Class Diagram
+
+![diagram](./docs/class_diagram.png)
