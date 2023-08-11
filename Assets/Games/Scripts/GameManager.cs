@@ -174,6 +174,8 @@ public class GameManager : Singleton<GameManager>
     public void GameOver()
     {
         PlayerCar.SetState(CarController.State.Pausing);
+        var resultPanel = gameOverUI.GetComponentInChildren<ResultPanel>();
+        resultPanel.ShowScore(score);
         inGameUI.SetActive(false);
         gameOverUI.SetActive(true);
     }
