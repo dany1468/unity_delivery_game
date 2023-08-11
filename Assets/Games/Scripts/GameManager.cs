@@ -1,18 +1,23 @@
-﻿using System;
-using UnityEngine;
+﻿using UnityEngine;
 using System.Collections.Generic;
 using System.Linq;
-using TMPro;
 using Random = UnityEngine.Random;
 
 public class FoodContainer
 {
+    private const int MaxFoodCount = 3;
+        
     private readonly List<Food> foods = Enumerable.Empty<Food>().ToList();
     public Food[] CurrentFoods => foods.ToArray();
+    public bool IsFull => MaxFoodCount <= foods.Count;
 
-    public void Put(Food food)
+    public bool Put(Food food)
     {
+        if (IsFull) return false;
+        
         foods.Add(food);
+
+        return true;
     }
 
     public Food[] TakeAll()
@@ -25,28 +30,29 @@ public class FoodContainer
 
 public class Score
 {
-    private int totalReceivedFoodCount = 0;
-    private int totalDeliveredFoodCount = 0;
-    
+    public int TotalReceivedFoodCount { get; private set; } = 0;
+
+    public int TotalDeliveredFoodCount { get; private set; } = 0;
+
     public void AddReceivedFoodCount(int count)
     {
-        totalReceivedFoodCount += count;
+        TotalReceivedFoodCount += count;
     }
     
     public void AddDeliveredFoodCount(int count)
     {
-        totalDeliveredFoodCount += count;
+        TotalDeliveredFoodCount += count;
     }
 }
 
 public class GameManager : Singleton<GameManager>
 {
-    private CarController playerCar;
+    public CarController PlayerCar { get; private set; }
 
     [Header("Timer オブジェクト")] [SerializeField]
     private Timer timer;
 
-    public bool GameIsPlaying { get; private set; } = true;
+    public bool GameIsPlaying { get; private set; } = false;
 
     // TODO: Tag から自動取得でいいかもしれない
     [Header("Provider オブジェクト")] [SerializeField]
@@ -54,10 +60,18 @@ public class GameManager : Singleton<GameManager>
 
     [SerializeField] private ShokudoController[] ShokudoControllers;
 
+
+    [Header("ゲーム中の UI オブジェクト")] [SerializeField]
+    private GameObject inGameUI;
+    
     [Header("全体マップ UI オブジェクト")] [SerializeField]
     private GameObject overallMapUI;
 
-    [SerializeField] private InformationPanel informationPanel;
+    [SerializeField] 
+    private InformationPanel informationPanel;
+    
+    [Header("ゲーム終了 UI オブジェクト")] [SerializeField]
+    private GameObject gameOverUI;
 
     private readonly FoodContainer foodContainer = new FoodContainer();
     private readonly Score score = new Score();
@@ -71,30 +85,46 @@ public class GameManager : Singleton<GameManager>
     public void ReceiveFood(Food food)
     {
         foodContainer.Put(food);
-        informationPanel.ShowReceivedFood(foodContainer);
         score.AddReceivedFoodCount(1);
+        UpdateInformationPanel();
     }
 
     public Food[] DeliverFood()
     {
         var deliveredFoods = foodContainer.TakeAll();
         score.AddDeliveredFoodCount(deliveredFoods.Length);
+        UpdateInformationPanel();
         return deliveredFoods;
+    }
+    
+    public bool HasFood() => foodContainer.CurrentFoods.Any();
+    public bool IsContainerFull() => foodContainer.IsFull;
+    
+    private void UpdateInformationPanel()
+    {
+        informationPanel.ShowReceivedFood(foodContainer);
+        informationPanel.UpdateScore(score);
     }
 
     private void Start()
     {
-        playerCar = GameObject.FindGameObjectWithTag("Player").GetComponent<CarController>();
+        inGameUI.SetActive(false);
+        gameOverUI.SetActive(false);
+        
+        PlayerCar = GameObject.FindGameObjectWithTag("Player").GetComponent<CarController>();
         ClearReceivedFoods();
+        GameIsPlaying = true;
 
         // TODO: とりあえず起動から 1 秒後にスタートにしている
         Invoke(nameof(StartGame), 1.0f);
     }
-
+    
     private void StartGame()
     {
-        playerCar.SetState(CarController.State.Driving);
+        PlayerCar.SetState(CarController.State.Driving);
         timer.StartClock();
+        inGameUI.SetActive(true);
+        gameOverUI.SetActive(false);
 
         Invoke(nameof(ActivateProviderRandomly), 5.0f);
         Invoke(nameof(ActivateShokudoRandomly), 5.0f);
@@ -108,7 +138,7 @@ public class GameManager : Singleton<GameManager>
     private void Update()
     {
         // NOTE: 全体マップ表示の切り替え
-        overallMapUI.SetActive(playerCar.ShowingMap);
+        overallMapUI.SetActive(PlayerCar.ShowingMap);
     }
 
     private void ActivateProviderRandomly()
@@ -143,5 +173,8 @@ public class GameManager : Singleton<GameManager>
 
     public void GameOver()
     {
+        PlayerCar.SetState(CarController.State.Pausing);
+        inGameUI.SetActive(false);
+        gameOverUI.SetActive(true);
     }
 }
